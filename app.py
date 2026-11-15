@@ -278,19 +278,68 @@ def new_db():
     return dict(types=[dict(nama=n, satuan=s, harga=h, aktif=True) for n, s, h in JENIS0], hist=[], users=[], dep=[], wd=[], sales=[], exp=[], seq=0)
 
 
+def _db_url():
+    """Alamat database Postgres (Neon). Kosong = pakai SQLite lokal."""
+    u = os.environ.get("DATABASE_URL")
+    if u:
+        return u
+    try:
+        return st.secrets.get("DATABASE_URL")
+    except Exception:
+        return None
+
+
+DB_URL = _db_url()
+PG_SQL_BUAT = "CREATE TABLE IF NOT EXISTS snapshot (id INTEGER PRIMARY KEY CHECK (id = 1), data TEXT NOT NULL, diubah TEXT)"
+
+
+def _pg_connect(url):
+    import psycopg2
+    con = psycopg2.connect(url, connect_timeout=15, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
+    con.autocommit = True
+    return con
+
+
 @st.cache_resource
-def _store(path):
+def _store(path, url=None):
+    if url:  # Postgres (Neon): data tidak hilang saat aplikasi restart
+        con = _pg_connect(url)
+        with con.cursor() as cur:
+            cur.execute(PG_SQL_BUAT)
+            cur.execute("SELECT data FROM snapshot WHERE id = 1")
+            row = cur.fetchone()
+        return dict(con=con, url=url, db=json.loads(row[0]) if row else new_db(), lock=threading.RLock(), hash=None, gagal={})
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     con = sqlite3.connect(path, check_same_thread=False)
-    con.execute("CREATE TABLE IF NOT EXISTS snapshot (id INTEGER PRIMARY KEY CHECK (id = 1), data TEXT NOT NULL, diubah TEXT)")
+    con.execute(PG_SQL_BUAT)
     row = con.execute("SELECT data FROM snapshot WHERE id = 1").fetchone()
-    return dict(con=con, db=json.loads(row[0]) if row else new_db(), lock=threading.RLock(), hash=None, gagal={})
+    return dict(con=con, url=None, db=json.loads(row[0]) if row else new_db(), lock=threading.RLock(), hash=None, gagal={})
 
 
-ST = _store(DB_PATH)
+ST = _store(DB_PATH, DB_URL)
 D = ST["db"]  # satu data bersama untuk semua pengguna dan semua sesi
 D.setdefault("wr", [])  # pengajuan penarikan saldo
 D.setdefault("pengaturan", {"wa": ""})
+
+
+def _pg_simpan(txt):
+    """Simpan ke Postgres; sambung ulang sekali bila koneksi sudah diputus server (Neon tidur saat idle)."""
+    for percobaan in range(2):
+        try:
+            if ST["con"] is None or ST["con"].closed:
+                ST["con"] = _pg_connect(ST["url"])
+            with ST["con"].cursor() as cur:
+                cur.execute("INSERT INTO snapshot (id, data, diubah) VALUES (1, %s, %s) "
+                            "ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, diubah = EXCLUDED.diubah", (txt, now()))
+            return
+        except Exception:
+            try:
+                ST["con"].close()
+            except Exception:
+                pass
+            ST["con"] = None
+            if percobaan:
+                raise
 
 
 def simpan_jika_berubah():
@@ -298,8 +347,11 @@ def simpan_jika_berubah():
     h = hashlib.sha256(txt.encode()).hexdigest()
     if h != ST["hash"]:
         with ST["lock"]:
-            ST["con"].execute("INSERT OR REPLACE INTO snapshot (id, data, diubah) VALUES (1, ?, ?)", (txt, now()))
-            ST["con"].commit()
+            if ST["url"]:
+                _pg_simpan(txt)
+            else:
+                ST["con"].execute("INSERT OR REPLACE INTO snapshot (id, data, diubah) VALUES (1, ?, ?)", (txt, now()))
+                ST["con"].commit()
         ST["hash"] = h
 
 
@@ -1083,8 +1135,11 @@ def pg_laporan():
 def pg_atur():
     head("Pengaturan")
     st.markdown("**EcoLedger Darling** adalah platform digital untuk membantu operasional **Bank Sampah Darling Berseri**.")
-    st.markdown(f"**Penyimpanan data:** berkas SQLite `{DB_PATH}`. Data tetap ada saat aplikasi dimulai ulang selama berkas ini dipertahankan. "
-                "Di hosting dengan disk sementara (misalnya Streamlit Community Cloud) berkas ini bisa hilang, jadi unduh cadangan secara berkala.")
+    if ST["url"]:
+        st.markdown("**Penyimpanan data:** database Postgres (Neon). Data tetap ada saat aplikasi dimulai ulang. Tetap disarankan mengunduh cadangan secara berkala.")
+    else:
+        st.markdown(f"**Penyimpanan data:** berkas SQLite `{DB_PATH}`. Data tetap ada saat aplikasi dimulai ulang selama berkas ini dipertahankan. "
+                    "Di hosting dengan disk sementara (misalnya Streamlit Community Cloud) berkas ini bisa hilang, jadi unduh cadangan secara berkala.")
     aman = {**D, "users": [{k: v for k, v in u.items() if k != "pw"} for u in D["users"]]}
     st.download_button("Unduh cadangan data (JSON, tanpa kata sandi)", json.dumps(aman, ensure_ascii=False, indent=1).encode("utf-8"), f"cadangan_ecoledger_{date.today()}.json", "application/json")
     st.subheader("Nomor WhatsApp pengurus")
