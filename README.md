@@ -15,11 +15,12 @@ Disusun oleh **Kelompok 11**.
 |---|---|---|
 | 1 | Link aplikasi (Streamlit), status **deployed** | https://ecoledger-darling-demo.streamlit.app |
 | 2 | Repository GitHub (public) | Repository ini |
-| 3 | Slide presentasi | [`Slide_Presentasi_Kelompok_11.pptx`](Slide_Presentasi_Kelompok_11.pptx) |
-| 4 | Hasil wawancara (Word) | [`Hasil_Wawancara_Kelompok_11.docx`](Hasil_Wawancara_Kelompok_11.docx) |
-| 5 | Source code | [`app.py`](app.py) |
-| 6 | URL swimlane diagram | https://swimlanes.io/u/FxU2YbX8tN |
-| 7 | Logo aplikasi | [`assets/ecoledger_darling_logo.png`](assets/ecoledger_darling_logo.png) |
+| 3 | Proposal | [`Proposal_EcoLedger_Darling_Kelompok_11.docx`](Proposal_EcoLedger_Darling_Kelompok_11.docx) |
+| 4 | Slide presentasi | [`Slide_Presentasi_Kelompok_11.pptx`](Slide_Presentasi_Kelompok_11.pptx) |
+| 5 | Hasil wawancara (Word) | [`Hasil_Wawancara_Kelompok_11.docx`](Hasil_Wawancara_Kelompok_11.docx) |
+| 6 | Source code | [`app.py`](app.py) |
+| 7 | URL swimlane diagram | https://swimlanes.io/u/FxU2YbX8tN |
+| 8 | Logo aplikasi | [`assets/ecoledger_darling_logo.png`](assets/ecoledger_darling_logo.png) |
 
 ## Tim
 | No | Nama | NIM |
@@ -103,6 +104,7 @@ Berkas `secrets.toml` tidak boleh diunggah ke GitHub.
 - `requirements.txt`: daftar pustaka
 - `assets/`: logo aplikasi EcoLedger Darling
 - `.streamlit/`: pengaturan tema dan contoh pengaturan rahasia
+- `Proposal_EcoLedger_Darling_Kelompok_11.docx`: proposal proyek
 - `Slide_Presentasi_Kelompok_11.pptx`: slide presentasi
 - `Hasil_Wawancara_Kelompok_11.docx`: hasil wawancara
 
