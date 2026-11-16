@@ -15,8 +15,8 @@ Disusun oleh **Kelompok 11**.
 |---|---|---|
 | 1 | Link aplikasi (Streamlit), status **deployed** | https://ecoledger-darling-demo.streamlit.app |
 | 2 | Repository GitHub (public) | Repository ini |
-| 3 | Slide presentasi | [PDF](docs/Slide_Presentasi_Kelompok_11.pdf) · [PowerPoint](docs/Slide_Presentasi_Kelompok_11.pptx) |
-| 4 | Hasil wawancara (Word) | [`docs/Hasil_Wawancara_Kelompok_11.docx`](docs/Hasil_Wawancara_Kelompok_11.docx) |
+| 3 | Slide presentasi | [`Slide_Presentasi_Kelompok_11.pptx`](Slide_Presentasi_Kelompok_11.pptx) |
+| 4 | Hasil wawancara (Word) | [`Hasil_Wawancara_Kelompok_11.docx`](Hasil_Wawancara_Kelompok_11.docx) |
 | 5 | Source code | [`app.py`](app.py) |
 | 6 | URL swimlane diagram | https://swimlanes.io/u/FxU2YbX8tN |
 | 7 | Logo aplikasi | [`assets/ecoledger_darling_logo.png`](assets/ecoledger_darling_logo.png) |
@@ -103,7 +103,8 @@ Berkas `secrets.toml` tidak boleh diunggah ke GitHub.
 - `requirements.txt`: daftar pustaka
 - `assets/`: logo aplikasi EcoLedger Darling
 - `.streamlit/`: pengaturan tema dan contoh pengaturan rahasia
-- `docs/`: slide presentasi dan hasil wawancara
+- `Slide_Presentasi_Kelompok_11.pptx`: slide presentasi
+- `Hasil_Wawancara_Kelompok_11.docx`: hasil wawancara
 
 ## Catatan
 - Pada versi yang di-deploy, data disimpan di database Postgres (Neon), sehingga
