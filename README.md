@@ -15,7 +15,7 @@ Disusun oleh **Kelompok 11**.
 |---|---|---|
 | 1 | Link aplikasi (Streamlit), status **deployed** | https://ecoledger-darling-demo.streamlit.app |
 | 2 | Repository GitHub (public) | Repository ini |
-| 3 | Slide presentasi | [`docs/Kelompok_11_Sains_Data_Industri.pdf`](docs/Kelompok_11_Sains_Data_Industri.pdf) |
+| 3 | Slide presentasi | [PDF](docs/Slide_Presentasi_Kelompok_11.pdf) · [PowerPoint](docs/Slide_Presentasi_Kelompok_11.pptx) |
 | 4 | Hasil wawancara (Word) | [`docs/Hasil_Wawancara_Kelompok_11.docx`](docs/Hasil_Wawancara_Kelompok_11.docx) |
 | 5 | Source code | [`app.py`](app.py) |
 | 6 | URL swimlane diagram | https://swimlanes.io/u/FxU2YbX8tN |
