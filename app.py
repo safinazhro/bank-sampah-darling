@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import time
 import hmac
@@ -9,7 +10,8 @@ import threading
 import urllib.parse
 import base64
 from functools import lru_cache
-from datetime import date, datetime, timedelta
+import html
+from datetime import date, datetime, timedelta, timezone
 import pandas as pd
 import plotly.express as px
 import streamlit as st
@@ -33,34 +35,7 @@ h2,h3{font-weight:700;color:var(--g9);font-size:1.05rem}
 .hd .rt{color:var(--mute);font-size:.8rem;background:#fff;border:1px solid var(--line);border-radius:99px;padding:.3rem .85rem}
 [data-testid="stSidebar"]{background:var(--g9)}
 [data-testid="stSidebar"] *{color:#e4efe8}
-.bx{display:flex;gap:.65rem;align-items:center;padding:.2rem 1.8rem .8rem .8rem}
-.bx img{flex:0 0 52px;width:52px;height:52px;object-fit:contain;background:#FDF9EB;border-radius:12px;padding:0}
-.bx div{min-width:0}
-.bx b{display:block;color:#fff;font-size:1rem;font-weight:800;line-height:1.2}
-.bx span{display:block;color:#a9cbb6;font-size:.68rem;line-height:1.3;margin-top:.1rem}
-.me{border-bottom:1px solid rgba(255,255,255,.12);padding:.1rem .8rem .8rem;margin-bottom:.7rem}
-.me b{display:block;color:#fff;font-size:.9rem;font-weight:700}
-.me span{font-size:.75rem;color:#a9cbb6}
 .chip{display:inline-block;background:rgba(184,230,75,.18);color:var(--lime)!important;border-radius:99px;font-size:.72rem;font-weight:700;padding:.15rem .7rem;margin:.8rem 0 .3rem .8rem}
-[data-testid="stSidebar"] [data-testid="stVerticalBlock"]{gap:.2rem}
-[data-testid="stSidebar"] [data-testid="stSidebarHeader"]{position:absolute;top:.45rem;right:.45rem;left:auto;width:auto;height:auto;min-height:0;padding:0;margin:0;background:transparent;z-index:5}
-[data-testid="stSidebar"] [data-testid="stSidebarUserContent"]{padding:.9rem .8rem 1rem}
-[data-testid="stSidebar"] button{justify-content:flex-start;align-items:center;gap:.7rem;border-radius:8px;min-height:2.6rem;padding:.35rem .8rem .35rem calc(.8rem - 3px);font-weight:500;font-size:.92rem;text-align:left}
-[data-testid="stSidebar"] button [data-testid="stMarkdownContainer"]{flex:1 1 auto;width:auto;justify-content:flex-start;text-align:left}
-[data-testid="stSidebar"] button p{text-align:left;margin:0}
-[data-testid="stSidebar"] button [data-testid="stIconMaterial"]{font-size:1.25rem}
-[data-testid="stSidebar"] [data-testid="stRadioGroup"]{align-items:stretch;gap:.2rem;width:100%}
-[data-testid="stSidebar"] [data-testid="stRadioGroup"]>div{width:100%}
-[data-testid="stSidebar"] [data-testid="stRadioOption"]{display:block;width:100%;box-sizing:border-box;min-height:2.6rem;margin:0;padding:.55rem .8rem .55rem calc(.8rem - 3px);border-radius:8px;border-left:3px solid transparent;cursor:pointer;font-size:.92rem;font-weight:500;text-align:left}
-[data-testid="stSidebar"] [data-testid="stRadioOption"]>div{display:flex;align-items:center;justify-content:flex-start}
-[data-testid="stSidebar"] [data-testid="stRadioOption"]>div>div:first-child{display:none}
-[data-testid="stSidebar"] [data-testid="stRadioOption"]:hover{background:rgba(255,255,255,.08)}
-[data-testid="stSidebar"] [data-testid="stRadioOption"][data-selected]{background:rgba(184,230,75,.15);border-left-color:var(--lime);font-weight:700}
-[data-testid="stSidebar"] [data-testid="stRadioOption"] [data-testid="stMarkdownContainer"] p{display:flex;align-items:center;gap:.7rem;margin:0;text-align:left}
-[data-testid="stSidebar"] [data-testid="stRadioOption"] [data-testid="stIconMaterial"]{font-size:1.25rem}
-[data-testid="stSidebar"] .stButton>button,[data-testid="stSidebar"] .stButton>button *{justify-content:flex-start!important;text-align:left!important}
-[data-testid="stSidebar"] .stButton>button{background:transparent;border:0;border-left:3px solid transparent;min-height:2.6rem;padding:.35rem .8rem .35rem calc(.8rem - 3px);gap:.7rem}
-[data-testid="stSidebar"] .stButton>button:hover{background:rgba(255,255,255,.08)}
 .stButton>button,.stDownloadButton>button,.stFormSubmitButton>button{background:var(--g7);color:#fff;border:0;border-radius:10px;font-weight:600;min-height:2.7rem}
 .stButton>button:hover,.stDownloadButton>button:hover{background:var(--g9);color:#fff}
 .stButton>button:disabled{background:#cfd8cd;color:#fff}
@@ -202,16 +177,47 @@ header[data-testid="stHeader"]{border:0;box-shadow:none}
 .es .ic svg{width:25px;height:25px}
 .es b{font-size:1rem;font-weight:700;color:var(--forest)}
 .es p{margin:.35rem 0 0;max-width:30rem;font-size:.86rem;line-height:1.55;color:#24563E}
-/* ===== bagian atas sidebar: identitas aplikasi | identitas pengguna | menu ===== */
-[data-testid="stSidebar"] [data-testid="stSidebarUserContent"]{padding:1rem .8rem .8rem}
-.bx{display:flex;align-items:center;gap:.7rem;box-sizing:border-box;width:100%;margin:0;padding:.1rem 1.9rem .95rem .8rem;border-bottom:1px solid rgba(255,255,255,.12)}
-.bx img{flex:0 0 44px;width:44px;height:44px;border-radius:11px}
-.bx b{font-size:.98rem;font-weight:700;letter-spacing:-.005em;line-height:1.2}
-.bx span{font-size:.66rem;line-height:1.3;margin-top:.15rem;white-space:nowrap;color:#a9cbb6}
-.me{box-sizing:border-box;width:100%;margin:0 0 .6rem;padding:.9rem .8rem .9rem;border-bottom:1px solid rgba(255,255,255,.12)}
-.me b{font-size:.92rem;font-weight:600;line-height:1.3}
-.me span{display:block;margin-top:.15rem;font-size:.72rem;line-height:1.35;color:#a9cbb6}
-[data-testid="stSidebar"] [data-testid="stRadio"],[data-testid="stSidebar"] [data-testid="stRadio"]>div{width:100%}
+/* ===== SIDEBAR: satu blok untuk semua role (Pengurus, Nasabah, Pengepul) ===== */
+[data-testid="stSidebar"]{--sb-pad:1rem;--sb-btn:36px;--sb-row:2.75rem;--sb-line:rgba(255,255,255,.12)}
+[data-testid="stSidebar"] [data-testid="stSidebarContent"]{padding:0;scrollbar-gutter:auto;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.28) transparent}
+[data-testid="stSidebar"] [data-testid="stSidebarUserContent"]{box-sizing:border-box;width:100%;padding:1.1rem var(--sb-pad) .75rem}
+[data-testid="stSidebar"] [data-testid="stVerticalBlock"]{gap:.2rem}
+[data-testid="stSidebar"] [data-testid="stMarkdownContainer"]{margin-bottom:0}
+/* identitas aplikasi: logo dan teks sejajar secara vertikal; tombol tutup sidebar sejajar dengan logo */
+.bx{display:flex;align-items:center;gap:.75rem;box-sizing:border-box;width:100%;margin:0;padding:0 calc(var(--sb-btn) + .5rem) 1rem 0;border-bottom:1px solid var(--sb-line)}
+.bx img{flex:0 0 44px;width:44px;height:44px;object-fit:contain;background:#FDF9EB;border-radius:12px}
+.bx div{flex:1 1 auto;min-width:0}
+.bx b{display:block;color:#fff;font-size:.98rem;font-weight:700;letter-spacing:-.005em;line-height:1.25}
+.bx span{display:block;margin-top:.2rem;color:#a9cbb6;font-size:.66rem;line-height:1.3}
+[data-testid="stSidebar"] [data-testid="stSidebarHeader"]{position:absolute;top:calc(1.1rem + (44px - var(--sb-btn)) / 2);right:var(--sb-pad);left:auto;width:auto;height:auto;min-height:0;padding:0;margin:0;background:transparent;z-index:5}
+[data-testid="stSidebar"] [data-testid="stSidebarHeader"] button{display:inline-flex;align-items:center;justify-content:center;width:var(--sb-btn);height:var(--sb-btn);min-width:0;min-height:0;padding:0;margin:0;gap:0;border:0;border-radius:8px;background:transparent;transition:background-color .2s ease}
+[data-testid="stSidebar"] [data-testid="stSidebarHeader"] button:hover{background:rgba(255,255,255,.08)}
+/* identitas pengguna */
+.me{box-sizing:border-box;width:100%;margin:0 0 1rem;padding:1rem 0;border-bottom:1px solid var(--sb-line)}
+.me b{display:block;color:#fff;font-size:.92rem;font-weight:600;line-height:1.35}
+.me span{display:block;margin-top:.15rem;color:#a9cbb6;font-size:.72rem;line-height:1.4}
+/* menu: kotak aktif selebar area navigasi, tinggi seragam, ikon dan teks rata tengah */
+[data-testid="stSidebar"] [data-testid="stRadio"],[data-testid="stSidebar"] [data-testid="stRadioGroup"],[data-testid="stSidebar"] [data-testid="stRadioGroup"]>div{width:100%}
+[data-testid="stSidebar"] [data-testid="stRadioGroup"]{display:flex;flex-direction:column;align-items:stretch;gap:.2rem}
+[data-testid="stSidebar"] [data-testid="stRadioOption"]{position:relative;overflow:hidden;display:flex;align-items:center;box-sizing:border-box;width:100%;min-height:var(--sb-row);margin:0;padding:.6rem .9rem;border-radius:10px;cursor:pointer;font-size:.92rem;font-weight:500;line-height:1.3;text-align:left;transition:background-color .2s ease}
+[data-testid="stSidebar"] [data-testid="stRadioOption"]>div{display:flex;align-items:center;justify-content:flex-start;flex:1 1 auto;min-width:0}
+[data-testid="stSidebar"] [data-testid="stRadioOption"]>div>div:first-child{display:none}
+[data-testid="stSidebar"] [data-testid="stRadioOption"]:hover{background:rgba(255,255,255,.08)}
+[data-testid="stSidebar"] [data-testid="stRadioOption"][data-selected]{background:rgba(184,230,75,.15);font-weight:700}
+[data-testid="stSidebar"] [data-testid="stRadioOption"]::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--lime);opacity:0;transform:scaleY(.4);transition:opacity .2s ease,transform .2s ease}
+[data-testid="stSidebar"] [data-testid="stRadioOption"][data-selected]::before{opacity:1;transform:scaleY(1)}
+[data-testid="stSidebar"] [data-testid="stRadioOption"]:focus-within{outline:none}
+[data-testid="stSidebar"] [data-testid="stRadioOption"][data-focus-visible]{outline:2px solid var(--lime);outline-offset:-2px}
+[data-testid="stSidebar"] [data-testid="stRadioOption"] [data-testid="stMarkdownContainer"] p{display:flex;align-items:center;gap:.75rem;margin:0;line-height:1.3;text-align:left}
+[data-testid="stSidebar"] [data-testid="stRadioOption"] [role="img"],[data-testid="stSidebar"] .stButton>button [data-testid="stIconMaterial"]{flex:0 0 1.2rem;width:1.2rem!important;height:1.2rem!important;font-size:1.2rem!important;line-height:1.2rem!important;text-align:center;overflow:visible}
+[data-testid="stSidebar"] .stButton>button [data-has-shortcut]{gap:.75rem}
+[data-testid="stSidebar"] .stButton>button [data-has-shortcut]>span:first-child{flex:0 0 1.2rem;width:1.2rem}
+/* tombol Keluar: ukuran dan jarak isi sama dengan item menu */
+[data-testid="stSidebar"] .stButton>button{justify-content:flex-start;align-items:center;gap:.75rem;width:100%;min-height:var(--sb-row);padding:.6rem .9rem;border:0;border-radius:10px;background:transparent;font-size:.92rem;font-weight:500;text-align:left;transition:background-color .2s ease}
+[data-testid="stSidebar"] .stButton>button,[data-testid="stSidebar"] .stButton>button *{justify-content:flex-start!important;text-align:left!important}
+[data-testid="stSidebar"] .stButton>button [data-testid="stMarkdownContainer"]{flex:1 1 auto;width:auto}
+[data-testid="stSidebar"] .stButton>button p{margin:0}
+[data-testid="stSidebar"] .stButton>button:hover{background:rgba(255,255,255,.08)}
 /* ===== RESPONSIVE: tablet (<=1024px) dan HP (<=640px); desktop tidak berubah ===== */
 .tw{max-width:100%;-webkit-overflow-scrolling:touch}
 .grid>.card{height:auto}.tw+.grid,.tw+.tw{margin-top:.8rem}
@@ -223,8 +229,7 @@ html,body,.stApp,[data-testid="stAppViewContainer"],[data-testid="stMain"]{max-w
  .block-container{max-width:100%;padding:3.4rem 1.2rem 3rem}
  [data-testid="stSidebar"][aria-expanded="true"]{width:min(17rem,86vw)!important;min-width:0!important;max-width:86vw!important}
  [data-testid="stExpandSidebarButton"]{background:#fff;border:1px solid var(--bd);border-radius:10px;min-width:44px;min-height:44px;box-shadow:var(--sh)}
- [data-testid="stSidebar"] [data-testid="stSidebarHeader"] button{min-width:44px;min-height:44px}
- [data-testid="stSidebar"] [data-testid="stRadioOption"],[data-testid="stSidebar"] button{min-height:2.9rem}
+ [data-testid="stSidebar"]{--sb-btn:44px;--sb-row:2.9rem}
  .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
  .fin{grid-template-columns:repeat(2,minmax(0,1fr))}.fin .main{grid-column:1/-1}
  [data-testid="stMain"] [data-testid="stHorizontalBlock"]{flex-wrap:wrap!important;gap:.7rem!important}
@@ -264,10 +269,37 @@ JENIS0 = [("Kardus", "kg", 2000), ("Emberan", "kg", 1700), ("Besi", "kg", 4000),
           ("Emberan hitam", "kg", 1200), ("Botol beling", "kg", 500), ("Aki", "kg", 10000), ("Galon aqua", "pcs", 5000), ("Botol plastik", "kg", 1500)]
 
 
+# ---------- tanggal dan waktu: selalu WIB (Asia/Jakarta), tidak bergantung zona waktu server ----------
+try:
+    from zoneinfo import ZoneInfo
+    WIB = ZoneInfo("Asia/Jakarta")
+except Exception:  # paket tzdata belum terpasang (mis. Windows): WIB tetap UTC+7 sepanjang tahun, tanpa DST
+    WIB = timezone(timedelta(hours=7), "WIB")
+os.environ["TZ"] = "Asia/Jakarta"  # pengaman tambahan untuk pustaka lain yang membaca jam lokal proses
+if hasattr(time, "tzset"):
+    time.tzset()
+
+
+def now_dt(): return datetime.now(WIB)
+def hari_ini(): return now_dt().date()
+def tgl_panjang(d): return f"{d.day} {BLN[d.month - 1]} {d.year}"
+
+
 def rp(n): n = int(round(n)); return ("-" if n < 0 else "") + "Rp" + f"{abs(n):,}".replace(",", ".")
 def fmt(x): return f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".").rstrip("0").rstrip(",")
 def tgl(iso): d = date.fromisoformat(iso); return f"{d.day} {BLN[d.month - 1][:3]} {d.year}"
-def now(): return datetime.now().strftime("%Y-%m-%d %H:%M")
+def now(): return now_dt().strftime("%Y-%m-%d %H:%M")
+
+
+_RE_WKT = re.compile(r"(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})")
+
+
+def wkt(s):
+    """Tampilan stempel waktu: '2026-11-20 08:43' -> '20 Nov 2026, 08.43'. Nilai kosong atau tak dikenal dikembalikan apa adanya."""
+    def f(m):
+        y, mo, d, h, mi = map(int, m.groups())
+        return f"{d} {BLN[mo - 1][:3]} {y}, {h:02d}.{mi:02d}" if 1 <= mo <= 12 else m.group(0)
+    return _RE_WKT.sub(f, s) if isinstance(s, str) else s
 def pill(s): return f'<span class="pill {"p-o" if s in ("Disetujui", "Aktif", "Selesai") else "p-w" if s.startswith("Menunggu") else "p-x"}">{s}</span>'
 
 
@@ -446,8 +478,8 @@ DESC = {"Input Setoran": "Catat sampah yang ditimbang. Total dihitung otomatis."
 
 
 def head(title, desc="", right=None):
-    t = date.today()
-    right = f"{t.day} {BLN[t.month - 1]} {t.year}" if right is None else right
+    t = hari_ini()
+    right = tgl_panjang(t) if right is None else right
     r = f'<div class="rt">{right}</div>' if right else ""
     bc = f'<div class="bc">EcoLedger Darling / <b>{title}</b></div>' if (title in DESC or title == "Ringkasan Dashboard") else ""
     st.markdown(f'<div class="hd"><div>{bc}<h1>{title}</h1><p>{desc or DESC.get(title, "")}</p></div>{r}</div>', unsafe_allow_html=True)
@@ -528,7 +560,7 @@ def reset_rows(ctx):
 
 # ---------- halaman pengurus ----------
 def pg_beranda():
-    t = date.today()
+    t = hari_ini()
     a = t.replace(day=1)
     pb = a - timedelta(days=1)
     pa = pb.replace(day=1)
@@ -604,7 +636,7 @@ def pg_beranda():
             st.markdown('<div class="empty">Tidak ada setoran yang menunggu persetujuan.</div>', unsafe_allow_html=True)
 
 def simpan_setoran(u, items, metode, langsung):
-    d = dict(id=nid(), tgl=date.today().isoformat(), email=u["email"], nama=u["nama"], metode=metode, items=items,
+    d = dict(id=nid(), tgl=hari_ini().isoformat(), email=u["email"], nama=u["nama"], metode=metode, items=items,
              status="Disetujui" if langsung else "Menunggu", sold=None, ver=1, log=[], oleh=CU["nama"], tok=S.tok)
     catat(d, f"Dibuat oleh {CU['nama']}")
     if langsung:
@@ -625,7 +657,7 @@ def pg_input():
         if d["status"] == "Menunggu":
             st.info("Menunggu persetujuan nasabah lewat akunnya. Saldo dan stok belum bertambah.")
         else:
-            st.caption(f"Disetujui oleh {d['disetujui_oleh']} pada {d['disetujui_pada']}.")
+            st.caption(f"Disetujui oleh {d['disetujui_oleh']} pada {wkt(d['disetujui_pada'])}.")
         if st.button("Selesaikan & Input Nasabah Berikutnya", type="primary"):
             S.terakhir = None
             S.tok = secrets.token_hex(8)
@@ -690,7 +722,7 @@ def pg_kelola():
                     d["status"] = "Dibatalkan"
                     catat(d, f"Dibatalkan oleh {CU['nama']}")
                     st.rerun()
-            st.caption(" | ".join(d["log"]))
+            st.caption(" | ".join(wkt(x) for x in d["log"]))
 
 
 def pg_nasabah():
@@ -790,7 +822,7 @@ def proses_wr(wid, aksi, teks="", alasan=""):
             return gagal("Setujui pengajuan dulu sebelum mengonfirmasi pembayaran.")
         if r.get("wd") or r["jumlah"] > saldo(r["email"]):
             return gagal("Pembayaran sudah tercatat, atau saldo nasabah tidak cukup.")
-        w = dict(id=nid(), tgl=date.today().isoformat(), waktu=now(), email=r["email"], nama=r["nama"], jumlah=r["jumlah"], oleh=me["nama"], wr=r["id"])
+        w = dict(id=nid(), tgl=hari_ini().isoformat(), waktu=now(), email=r["email"], nama=r["nama"], jumlah=r["jumlah"], oleh=me["nama"], wr=r["id"])
         D["wd"].append(w)
         r["status"], r["dibayar_pada"], r["wd"] = "Selesai", now(), w["id"]
         catat(r, f"Pembayaran dikonfirmasi selesai oleh {me['nama']}; saldo berkurang {rp(r['jumlah'])}")
@@ -815,8 +847,8 @@ def ket_wr(r):
 
 
 def tabel_wr(rows, nasabah=True):
-    return pd.DataFrame([{**({"Nasabah": r["nama"]} if nasabah else {}), "Diajukan": r["diajukan"], "Nominal": rp(r["jumlah"]), "Status": r["status"],
-                          "Dibayar": r["dibayar_pada"] or "-", "Keterangan": ket_wr(r)} for r in sorted(rows, key=lambda r: r["id"], reverse=True)])
+    return pd.DataFrame([{**({"Nasabah": r["nama"]} if nasabah else {}), "Diajukan": wkt(r["diajukan"]), "Nominal": rp(r["jumlah"]), "Status": r["status"],
+                          "Dibayar": wkt(r["dibayar_pada"]) or "-", "Keterangan": ket_wr(r)} for r in sorted(rows, key=lambda r: r["id"], reverse=True)])
 
 
 @st.fragment(run_every="15s")
@@ -828,7 +860,7 @@ def notif_wr():
     proses = [r for r in D["wr"] if r["status"] in ("Disetujui", "Menunggu Pengambilan")]
     if not (baru or proses):
         return
-    tr = "".join(f'<tr><td>{r["nama"]}</td><td class="r">{rp(r["jumlah"])}</td><td>{r["diajukan"]}</td><td class="r">{rp(saldo(r["email"]))}</td><td>{pill(r["status"])}</td></tr>' for r in (baru + proses)[:4])
+    tr = "".join(f'<tr><td>{r["nama"]}</td><td class="r">{rp(r["jumlah"])}</td><td>{wkt(r["diajukan"])}</td><td class="r">{rp(saldo(r["email"]))}</td><td>{pill(r["status"])}</td></tr>' for r in (baru + proses)[:4])
     st.markdown(f'<div class="notice"><b>Pengajuan penarikan saldo:</b> {len(baru)} menunggu konfirmasi, {len(proses)} menunggu pembayaran.'
                 f'<div class="tw"><table class="tbl"><tr><th>Nasabah</th><th class="r">Nominal</th><th>Diajukan</th><th class="r">Saldo tersedia</th><th>Status</th></tr>{tr}</table></div></div>', unsafe_allow_html=True)
     if st.button("Buka pengajuan penarikan", key="notif_buka"):
@@ -847,7 +879,7 @@ def kartu_wr(r):
     i = r["id"]
     with st.container(border=True, key=f"wrq{i}"):
         st.markdown(f'**{r["nama"]}** · {rp(r["jumlah"])} ' + pill(r["status"]), unsafe_allow_html=True)
-        st.caption(f'Diajukan {r["diajukan"]} · saldo nasabah saat ini {rp(saldo(r["email"]))}' + (f' · jadwal: {r["jadwal"]}' if r["jadwal"] else ""))
+        st.caption(f'Diajukan {wkt(r["diajukan"])} · saldo nasabah saat ini {rp(saldo(r["email"]))}' + (f' · jadwal: {r["jadwal"]}' if r["jadwal"] else ""))
         if r["status"] == "Menunggu Konfirmasi":
             if st.button("Setujui pengajuan", key=f"wrs{i}", type="primary"):
                 proses_wr(i, "setujui")
@@ -897,7 +929,7 @@ def pg_tarik():
         elif j > saldo_tersedia(em):
             st.error(f"Jumlah melebihi saldo tersedia ({rp(saldo_tersedia(em))}).")
         else:
-            D["wd"].append(dict(id=nid(), tgl=date.today().isoformat(), waktu=now(), email=em, nama=nm, jumlah=int(j), oleh=CU["nama"]))
+            D["wd"].append(dict(id=nid(), tgl=hari_ini().isoformat(), waktu=now(), email=em, nama=nm, jumlah=int(j), oleh=CU["nama"]))
             st.success(f"Diambil {rp(j)}. Sisa saldo {rp(saldo(em))}.")
     st.markdown('<div class="sec"><b>Riwayat pengajuan</b></div>', unsafe_allow_html=True)
     if D["wr"]:
@@ -906,7 +938,7 @@ def pg_tarik():
         st.caption("Belum ada pengajuan dari nasabah.")
     st.markdown('<div class="sec"><b>Riwayat penarikan</b></div>', unsafe_allow_html=True)
     if D["wd"]:
-        st.dataframe(pd.DataFrame([dict(Waktu=w["waktu"], Nasabah=w["nama"], Jumlah=rp(w["jumlah"]), Diproses=w["oleh"], Sumber=f"Pengajuan #{w['wr']}" if w.get("wr") else "Langsung") for w in reversed(D["wd"])]), hide_index=True, width="stretch")
+        st.dataframe(pd.DataFrame([dict(Waktu=wkt(w["waktu"]), Nasabah=w["nama"], Jumlah=rp(w["jumlah"]), Diproses=w["oleh"], Sumber=f"Pengajuan #{w['wr']}" if w.get("wr") else "Langsung") for w in reversed(D["wd"])]), hide_index=True, width="stretch")
     else:
         st.caption("Belum ada penarikan.")
 
@@ -920,7 +952,7 @@ def pg_jual():
         st.info("Belum ada stok yang disetujui untuk dijual.")
     else:
         pn = st.selectbox("Pengepul yang datang", [u["nama"] for u in pg])
-        tg = st.date_input("Tanggal penjualan", date.today())
+        tg = st.date_input("Tanggal penjualan", hari_ini(), format="DD/MM/YYYY")
         last = {}
         for s in aktif_sales():
             for i in s["items"]:
@@ -963,7 +995,7 @@ def pg_jual():
 def pg_keluar():
     head("Pengeluaran Operasional")
     c = st.columns(2)
-    tg = c[0].date_input("Tanggal", date.today())
+    tg = c[0].date_input("Tanggal", hari_ini(), format="DD/MM/YYYY")
     kat = c[1].selectbox("Kategori", ["Bensin", "Transportasi", "Perlengkapan", "Lainnya"])
     ds = st.text_input("Deskripsi")
     j = st.number_input("Jumlah (Rp)", min_value=0, step=1000)
@@ -1013,7 +1045,7 @@ def pg_jenis():
                 st.rerun()
     st.subheader("Riwayat perubahan harga")
     if D["hist"]:
-        st.dataframe(pd.DataFrame([dict(Waktu=x["waktu"], Jenis=x["jenis"], Lama=rp(x["lama"]), Baru=rp(x["baru"]), Oleh=x["oleh"]) for x in reversed(D["hist"])]), hide_index=True, width="stretch")
+        st.dataframe(pd.DataFrame([dict(Waktu=wkt(x["waktu"]), Jenis=x["jenis"], Lama=rp(x["lama"]), Baru=rp(x["baru"]), Oleh=x["oleh"]) for x in reversed(D["hist"])]), hide_index=True, width="stretch")
     else:
         st.caption("Belum ada perubahan harga.")
 
@@ -1117,10 +1149,10 @@ def pg_laporan():
     head("Laporan")
     kind = st.selectbox("Jenis laporan", ["Pembelian dari nasabah", "Penjualan ke pengepul", "Pengeluaran", "Net kas", "Penarikan saldo", "Saldo nasabah", "Stok sampah"])
     p = st.radio("Periode", ["Hari ini", "Bulan ini", "Rentang bebas"], horizontal=True)
-    t = date.today()
+    t = hari_ini()
     a, b = (t, t) if p == "Hari ini" else (t.replace(day=1), t) if p == "Bulan ini" else (None, None)
     if p == "Rentang bebas":
-        r = st.date_input("Dari tanggal sampai tanggal", (t.replace(day=1), t))
+        r = st.date_input("Dari tanggal sampai tanggal", (t.replace(day=1), t), format="DD/MM/YYYY")
         if len(r) != 2:
             st.stop()
         a, b = r
@@ -1128,7 +1160,8 @@ def pg_laporan():
     if df.empty:
         st.info("Tidak ada data pada periode ini.")
         return
-    st.dataframe(df, hide_index=True, width="stretch")
+    dfv = df.assign(Tanggal=df["Tanggal"].map(tgl)) if "Tanggal" in df.columns else df
+    st.dataframe(dfv, hide_index=True, width="stretch")
     st.download_button("Unduh CSV (dibuka di Excel)", df.to_csv(index=False, sep=";", decimal=",").encode("utf-8-sig"), f"{kind.lower().replace(' ', '_')}_{a}_{b}.csv", "text/csv")
 
 
@@ -1141,7 +1174,7 @@ def pg_atur():
         st.markdown(f"**Penyimpanan data:** berkas SQLite `{DB_PATH}`. Data tetap ada saat aplikasi dimulai ulang selama berkas ini dipertahankan. "
                     "Di hosting dengan disk sementara (misalnya Streamlit Community Cloud) berkas ini bisa hilang, jadi unduh cadangan secara berkala.")
     aman = {**D, "users": [{k: v for k, v in u.items() if k != "pw"} for u in D["users"]]}
-    st.download_button("Unduh cadangan data (JSON, tanpa kata sandi)", json.dumps(aman, ensure_ascii=False, indent=1).encode("utf-8"), f"cadangan_ecoledger_{date.today()}.json", "application/json")
+    st.download_button("Unduh cadangan data (JSON, tanpa kata sandi)", json.dumps(aman, ensure_ascii=False, indent=1).encode("utf-8"), f"cadangan_ecoledger_{hari_ini()}.json", "application/json")
     st.subheader("Nomor WhatsApp pengurus")
     st.caption("Dipakai tombol 'Hubungi Pengurus via WhatsApp' di akun nasabah. Tidak ada nomor bawaan.")
     wa_in = st.text_input("Nomor WhatsApp pengurus", value=D["pengaturan"].get("wa", ""), placeholder="mis. 0812xxxxxxx")
@@ -1165,7 +1198,7 @@ def pg_atur():
 
 # ---------- data contoh (ditandai demo=True, bisa dihapus dari Pengaturan) ----------
 def dep_demo(hari, email, nama, metode, rows, status="Disetujui"):
-    d = dict(id=nid(), tgl=(date.today() - timedelta(days=hari)).isoformat(), email=email, nama=nama, metode=metode,
+    d = dict(id=nid(), tgl=(hari_ini() - timedelta(days=hari)).isoformat(), email=email, nama=nama, metode=metode,
              items=[dict(jenis=j, satuan=tipe(j)["satuan"], jml=q, harga=tipe(j)["harga"]) for j, q in rows],
              status=status, sold=None, ver=1, log=[], oleh="Pengurus Demo", demo=True)
     catat(d, "Data contoh")
@@ -1184,15 +1217,15 @@ def seed_demo():
     lama = [dep_demo(24, *n1, "Tabung", [("Kardus", 12), ("Botol plastik", 4)]), dep_demo(22, *n2, "Tunai", [("Besi", 6), ("Kaleng", 3)])]
     sid = nid()
     its = [dict(jenis=j, satuan=tipe(j)["satuan"], jml=q, harga=h) for j, q, h in [("Kardus", 12.5, 2400), ("Botol plastik", 4.0, 1800), ("Besi", 6.0, 4500), ("Kaleng", 3.0, 2800)]]
-    D["sales"].append(dict(id=sid, tgl=(date.today() - timedelta(days=20)).isoformat(), email="pengepul.demo@contoh.com", pengepul="Pengepul Demo", items=its, status="Aktif", oleh="Pengurus Demo", demo=True))
+    D["sales"].append(dict(id=sid, tgl=(hari_ini() - timedelta(days=20)).isoformat(), email="pengepul.demo@contoh.com", pengepul="Pengepul Demo", items=its, status="Aktif", oleh="Pengurus Demo", demo=True))
     for d in lama:
         d["sold"] = sid
     dep_demo(9, *n1, "Tabung", [("Kardus", 8.5), ("Buku", 5)])
     dep_demo(6, *n2, "Tabung", [("Galon aqua", 4), ("Gelas botol", 7)])
     dep_demo(3, *n1, "Tabung", [("Emberan", 10), ("Duplek", 6)])
     dep_demo(1, *n1, "Tunai", [("Kardus", 5.5)], status="Menunggu")
-    D["wd"].append(dict(id=nid(), tgl=(date.today() - timedelta(days=5)).isoformat(), waktu=now(), email=n1[0], nama=n1[1], jumlah=10000, oleh="Pengurus Demo", demo=True))
-    D["exp"].append(dict(id=nid(), tgl=(date.today() - timedelta(days=7)).isoformat(), kategori="Bensin", deskripsi="Antar sampah", jumlah=25000, oleh="Pengurus Demo", demo=True))
+    D["wd"].append(dict(id=nid(), tgl=(hari_ini() - timedelta(days=5)).isoformat(), waktu=now(), email=n1[0], nama=n1[1], jumlah=10000, oleh="Pengurus Demo", demo=True))
+    D["exp"].append(dict(id=nid(), tgl=(hari_ini() - timedelta(days=7)).isoformat(), kategori="Bensin", deskripsi="Antar sampah", jumlah=25000, oleh="Pengurus Demo", demo=True))
 
 
 def hapus_demo():
@@ -1266,7 +1299,7 @@ def n_setuju():
 
 def n_riwayat():
     head("Riwayat Setoran")
-    t = date.today()
+    t = hari_ini()
     f = st.selectbox("Periode", ["Semua", "Bulan ini", "30 hari terakhir"])
     a = {"Semua": date.min, "Bulan ini": t.replace(day=1), "30 hari terakhir": t - timedelta(days=30)}[f]
     data = [d for d in reversed(mine()) if d["tgl"] >= a.isoformat()]
@@ -1526,12 +1559,13 @@ def logo_b64(): return base64.b64encode(open(LOGO, "rb").read()).decode()
 
 def brand():
     img = f'<img src="data:image/png;base64,{logo_b64()}" alt="Logo EcoLedger Darling">' if os.path.exists(LOGO) else ""
-    st.markdown(f'<div class="bx">{img}<div><b>EcoLedger Darling</b><span>Sistem Informasi Bank Sampah</span></div></div>', unsafe_allow_html=True)
+    # identitas aplikasi dan identitas pengguna dalam satu blok, supaya jarak dan garis pemisahnya tidak bergantung pada margin antar-elemen Streamlit
+    st.markdown(f'<div class="bx">{img}<div><b>EcoLedger Darling</b><span>Sistem Informasi Bank Sampah</span></div></div>'
+                f'<div class="me"><b>{html.escape(CU["nama"])}</b><span>{html.escape(CU["peran"] or "Belum terdaftar")} · Bank Sampah Darling Berseri</span></div>', unsafe_allow_html=True)
 
 
 with st.sidebar:
     brand()
-    st.markdown(f'<div class="me"><b>{CU["nama"]}</b><span>{CU["peran"] or "Belum terdaftar"} · Bank Sampah Darling Berseri</span></div>', unsafe_allow_html=True)
     if CU["peran"] in PAGES:
         menu = PAGES[CU["peran"]]
         kunci = f"nav_{CU['peran']}"
@@ -1542,7 +1576,7 @@ with st.sidebar:
         if S.get(kunci) not in menu:
             S[kunci] = "Beranda"
         lencana = len(wr_open()) if CU["peran"] == "Pengurus" else 0
-        st.radio("Menu", list(menu), key=kunci, format_func=lambda k: f":material/{menu[k][0]}: {k}" + (f"  ({lencana})" if k == "Penarikan Saldo" and lencana else ""), label_visibility="collapsed")
+        st.radio("Menu", list(menu), key=kunci, format_func=lambda k: f":material/{menu[k][0]}: {k}" + (f"  ({lencana})" if k == "Penarikan Saldo" and lencana else ""), label_visibility="collapsed", width="stretch")
         S.page = S[kunci]
     if st.button("Keluar", icon=":material/logout:", type="tertiary", width="stretch"):
         S.page = "Beranda"
