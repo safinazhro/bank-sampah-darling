@@ -375,7 +375,9 @@ def _pg_simpan(txt):
 
 
 def simpan_jika_berubah():
-    txt = json.dumps(D, ensure_ascii=False, sort_keys=True)
+    # ST["db"] sama dengan D pada pemakaian biasa. Pada Mode Demo, D diganti data simulasi milik sesi,
+    # sehingga yang disimpan tetap hanya data produksi dan data demo tidak pernah ditulis ke database.
+    txt = json.dumps(ST["db"], ensure_ascii=False, sort_keys=True)
     h = hashlib.sha256(txt.encode()).hexdigest()
     if h != ST["hash"]:
         with ST["lock"]:
@@ -1519,12 +1521,209 @@ def login_page():
             st.caption("Lupa kata sandi? Minta pengurus membuatkan kata sandi sementara yang baru.")
 
 
+# ======================================================================
+# PENAMBAHAN: Mode Demo dan Panduan Penggunaan
+# Semua kode di bagian ini baru. Kode aplikasi di atasnya tidak diubah.
+#  - Mode Demo memakai data simulasi milik sesi (S["demo_db"]) yang menggantikan D,
+#    sehingga data produksi (ST["db"]) tidak pernah dibaca atau ditulis oleh sesi demo.
+#  - Isi panduan ada di panduan.py, pembangun data demo ada di demo_data.py.
+# ======================================================================
+import demo_data
+import panduan as pnd
+
+st.markdown("""<style>
+/* ===== penambahan: Mode Demo dan Panduan (hanya elemen baru) ===== */
+.demo.demo-bar{display:flex;flex-wrap:wrap;align-items:baseline;gap:.25rem .6rem;border:1px solid #F0DFA6;border-radius:12px;padding:.55rem .95rem;font-size:.84rem;line-height:1.45;margin:0 0 .7rem}
+.demo.demo-bar b{font-size:.72rem;letter-spacing:.06em;background:#7a5600;color:#fff3cf;border-radius:99px;padding:.1rem .6rem}
+[class*="st-key-barx"]{margin-bottom:.5rem}
+[class*="st-key-barx"] .stButton>button{font-size:.84rem}
+[class*="st-key-barx"] [data-testid="stButtonGroup"]{max-width:100%;flex-wrap:wrap}
+[class*="st-key-demobox"]{background:linear-gradient(135deg,#C4E3CD 0%,#A8D5B5 100%)!important;border:1px solid rgba(20,84,59,.16)!important;border-radius:14px;box-shadow:0 1px 2px rgba(20,84,59,.12),0 3px 8px rgba(20,84,59,.06);color:#0F3F2A;margin-top:.8rem}
+[class*="st-key-demobox"] [data-testid="stCaptionContainer"]{color:#24563E!important}
+[data-testid="stSidebar"] .chip{margin:.1rem 0 .7rem 0}
+@media(max-width:640px){.demo.demo-bar{font-size:.8rem}[class*="st-key-barx"] [data-testid="stHorizontalBlock"]{gap:.4rem!important}}
+</style>""", unsafe_allow_html=True)
+
+DESC["Panduan Penggunaan"] = "Tutorial lengkap setiap menu, disusun sesuai fitur yang tersedia di aplikasi."
+DEMO_USERS, DEMO_EMAILS = demo_data.DEMO_USERS, demo_data.DEMO_EMAILS
+_KUNCI_DEMO = ("demo", "demo_db", "demo_peran")
+
+
+def demo_db_baru(token): return demo_data.bangun(new_db(), hari_ini(), now(), token)
+
+
+def demo_aktif():
+    """True hanya jika sesi ini sungguh sesi demo: penanda, data demo, token, dan akun demo semuanya cocok.
+    Jika tidak, sisa penanda demo dibuang."""
+    ok = (bool(S.get("demo")) and S.get("uid") in DEMO_EMAILS and isinstance(S.get("demo_db"), dict)
+          and S["demo_db"].get("_token") == S.get("demo"))
+    if not ok:
+        for k in _KUNCI_DEMO:
+            S.pop(k, None)
+    return ok
+
+
+def _bersih_state(simpan):
+    for k in [k for k in S.keys() if k not in simpan]:
+        del S[k]
+
+
+def _peran_demo_sekarang(): return next((r for r, (e, _) in DEMO_USERS.items() if e == S.get("uid")), "Pengurus")
+
+
+def masuk_demo():
+    """Tombol 'Masuk sebagai Demo': tanpa email dan kata sandi, memakai data simulasi baru."""
+    _bersih_state(())
+    tok = secrets.token_hex(8)
+    S.demo, S.demo_db, S.demo_peran = tok, demo_db_baru(tok), "Pengurus"
+    S.uid, S.page = DEMO_USERS["Pengurus"][0], "Beranda"
+
+
+def ganti_peran_demo():
+    p, skrg = S.get("demo_peran"), _peran_demo_sekarang()
+    if p not in DEMO_USERS:  # menekan pilihan yang sedang aktif akan mengosongkan pilihan; kembalikan
+        S.demo_peran = skrg
+    elif p != skrg:
+        _bersih_state(("demo", "demo_db", "demo_peran"))
+        S.uid, S.page = DEMO_USERS[p][0], "Beranda"
+
+
+def atur_ulang_demo():
+    keep = ("demo", "uid", "demo_peran")
+    tok = S.get("demo")
+    _bersih_state(keep)
+    S.demo_db, S.page = demo_db_baru(tok), "Beranda"
+
+
+def _jaga_akun_demo():
+    """Akun demo tidak boleh rusak oleh percobaan (dinonaktifkan atau diubah perannya)."""
+    for r, (e, n) in DEMO_USERS.items():
+        u = next((x for x in D["users"] if x["email"] == e), None)
+        if u is None:
+            D["users"].append(dict(email=e, nama=n, peran=r, aktif=True, pw="", hp=""))
+        else:
+            u.update(aktif=True, peran=r, nama=n, wajib_ganti=False)
+
+
+def login_page_demo():
+    """Halaman login yang sudah ada, ditambah kotak 'Masuk sebagai Demo' di bawahnya."""
+    login_page()
+    _, c, _ = st.columns([1, 1.7, 1])
+    with c:
+        with st.container(border=True, key="demobox"):
+            st.markdown('<div class="lgt">Ingin mencoba dulu?</div>', unsafe_allow_html=True)
+            st.caption("Lihat tampilan Pengurus, Nasabah, dan Pengepul memakai data simulasi. Tanpa email, kata sandi, atau pendaftaran, dan tidak memengaruhi data asli.")
+            st.button("Masuk sebagai Demo", icon=":material/play_circle:", key="masuk_demo", type="secondary", width="stretch", on_click=masuk_demo)
+
+
+# ---------- versi aman halaman akun untuk Mode Demo ----------
+def pg_atur_demo():
+    head("Pengaturan")
+    st.info("Mode Demo: penyimpanan data, cadangan, kata sandi, dan data contoh dinonaktifkan agar data asli tetap aman. Nomor WhatsApp di bawah hanya tersimpan di sesi demo ini.")
+    st.markdown("**EcoLedger Darling** adalah platform digital untuk membantu operasional **Bank Sampah Darling Berseri**.")
+    st.subheader("Nomor WhatsApp pengurus")
+    st.caption("Dipakai tombol 'Hubungi Pengurus via WhatsApp' di akun nasabah. Gunakan nomor contoh saja.")
+    wa_in = st.text_input("Nomor WhatsApp pengurus", value=D["pengaturan"].get("wa", ""), placeholder="mis. 0812xxxxxxx")
+    if st.button("Simpan nomor WhatsApp pengurus", type="primary"):
+        if wa_in.strip() and not norm_wa(wa_in):
+            st.error("Nomor tidak valid. Gunakan format 08... atau 628... (10 sampai 15 digit).")
+        else:
+            D["pengaturan"]["wa"] = norm_wa(wa_in)
+            st.success("Nomor WhatsApp pengurus disimpan (hanya di sesi demo).")
+
+
+def profil_demo():
+    head("Profil Saya")
+    st.markdown(grid([("Nama", CU["nama"]), ("Peran", CU["peran"]), ("Jenis akun", "Akun Demo")]), unsafe_allow_html=True)
+    st.caption("Akun Demo tidak memiliki email dan kata sandi, jadi penggantian kata sandi dinonaktifkan.")
+
+
+# ---------- panduan ----------
+def penanda_demo_sidebar():
+    if MODE_DEMO:
+        st.markdown('<span class="chip">MODE DEMO</span>', unsafe_allow_html=True)
+
+
+@st.dialog("Panduan Halaman Ini", width="large")
+def dialog_panduan(peran, halaman):
+    g = pnd.PANDUAN.get(peran, {}).get(halaman)
+    st.markdown(f"#### {pnd.JUDUL.get((peran, halaman), halaman)}")
+    if MODE_DEMO:
+        st.caption("Mode Demo: Anda boleh langsung mencoba langkah di bawah. Semuanya memakai data simulasi.")
+    if g:
+        pnd.sajikan(st, g)
+    else:
+        st.info("Panduan untuk halaman ini belum tersedia. Buka menu Panduan Penggunaan.")
+
+
+def bar_atas():
+    """Di atas setiap halaman: tombol Panduan Halaman Ini, dan (Mode Demo) pita penanda serta pengalih peran."""
+    peran, hal = CU["peran"], S.page
+    if MODE_DEMO:
+        st.markdown('<div class="demo demo-bar"><b>MODE DEMO</b><span>Anda mencoba aplikasi dengan data simulasi. Semua aktivitas hanya berlaku di sesi ini dan tidak mengubah data asli.</span></div>', unsafe_allow_html=True)
+        S["demo_peran"] = peran
+        with st.container(key="barx"):
+            a, b, c = st.columns([5, 3, 3])
+            with a:
+                st.markdown('<div class="lgt">Lihat tampilan sebagai</div>', unsafe_allow_html=True)
+                st.segmented_control("Lihat tampilan sebagai", list(DEMO_USERS), key="demo_peran", on_change=ganti_peran_demo, label_visibility="collapsed")
+            b.button("Atur ulang data demo", icon=":material/restart_alt:", key="demo_reset", on_click=atur_ulang_demo, width="stretch")
+            buka = c.button("Panduan Halaman Ini", icon=":material/help:", key="pnd_hal", width="stretch")
+    else:
+        with st.container(key="barx"):
+            _, c = st.columns([5, 3])
+            buka = c.button("Panduan Halaman Ini", icon=":material/help:", key="pnd_hal", width="stretch")
+    if buka:
+        dialog_panduan(peran, hal)
+
+
+def jalan_pintas_panduan():
+    """Pintasan ke Panduan Penggunaan di halaman akun (Profil Saya untuk Nasabah/Pengepul, Pengaturan untuk Pengurus)."""
+    if S.page in ("Profil Saya", "Pengaturan"):
+        st.markdown('<div class="sec"><b>Bantuan</b></div>', unsafe_allow_html=True)
+        st.button("Buka Panduan Penggunaan", icon=":material/menu_book:", key="pnd_pintas", on_click=go, args=("Panduan Penggunaan",))
+
+
+def pg_panduan():
+    head("Panduan Penggunaan")
+    peran = CU["peran"]
+    semua = ["Pengurus", "Nasabah", "Pengepul"]
+    if MODE_DEMO:
+        tab = ["Mode Demo", f"Panduan {peran}"] + [f"Panduan {r}" for r in semua if r != peran] + ["Mulai Cepat"]
+    elif peran == "Pengurus":
+        tab = ["Mulai Cepat"] + [f"Panduan {r}" for r in semua] + ["Mode Demo"]
+    else:
+        tab = ["Mulai Cepat", f"Panduan {peran}"]
+    for nama, kontainer in zip(tab, st.tabs(tab)):
+        with kontainer:
+            if nama == "Mulai Cepat":
+                pnd.sajikan_langkah(st, pnd.MULAI_CEPAT)
+            elif nama == "Mode Demo":
+                if not MODE_DEMO:
+                    st.info("Mode Demo dibuka dari halaman login (tombol Masuk sebagai Demo). Setelah Keluar, Anda bisa memakainya untuk melatih petugas atau pengguna baru.")
+                st.caption("Mode Demo memakai data simulasi yang terpisah dari data asli.")
+                pnd.sajikan_langkah(st, pnd.DEMO)
+            else:
+                r = nama.split(" ", 1)[1]
+                st.caption(f"Pilih halaman di bawah ini untuk membaca tutorial lengkapnya. Panduan untuk tampilan {r}.")
+                for hal, g in pnd.PANDUAN[r].items():
+                    if hal != "Panduan Penggunaan":
+                        with st.expander(pnd.JUDUL.get((r, hal), hal)):
+                            pnd.sajikan(st, g)
+
+
 def masuk(): return cari(S.get("uid"))
 
 
+MODE_DEMO = demo_aktif()
+if MODE_DEMO:
+    D = S["demo_db"]  # data simulasi sesi ini menggantikan data bersama; data produksi tidak tersentuh
+    if D is ST["db"]:
+        st.stop()
+    _jaga_akun_demo()
 CU = masuk()
 if not CU:
-    login_page()
+    login_page_demo()
     st.stop()
 if CU.get("wajib_ganti"):
     st.caption("EcoLedger Darling · Bank Sampah Darling Berseri")
@@ -1548,6 +1747,12 @@ NASABAH = {"Beranda": ("home", n_beranda), "Persetujuan Setoran": ("task_alt", n
            "Saldo Saya": ("account_balance_wallet", n_saldo), "Riwayat Penarikan": ("payments", n_tarik), "Profil Saya": ("person", profil)}
 PENGEPUL = {"Beranda": ("home", p_beranda), "Perkiraan Stok": ("inventory_2", p_stok), "Riwayat Penjualan": ("local_shipping", p_riwayat), "Profil Saya": ("person", profil)}
 PAGES = {"Pengurus": PENGURUS, "Nasabah": NASABAH, "Pengepul": PENGEPUL}
+for _menu in PAGES.values():  # penambahan: menu Panduan Penggunaan untuk semua peran
+    _menu["Panduan Penggunaan"] = ("menu_book", pg_panduan)
+if MODE_DEMO:  # halaman akun versi aman untuk Mode Demo
+    PENGURUS["Pengaturan"] = ("settings", pg_atur_demo)
+    NASABAH["Profil Saya"] = ("person", profil_demo)
+    PENGEPUL["Profil Saya"] = ("person", profil_demo)
 
 
 def go(p): S["goto"] = p
@@ -1566,6 +1771,7 @@ def brand():
 
 with st.sidebar:
     brand()
+    penanda_demo_sidebar()
     if CU["peran"] in PAGES:
         menu = PAGES[CU["peran"]]
         kunci = f"nav_{CU['peran']}"
@@ -1589,6 +1795,8 @@ if CU["peran"] is None:
     st.error("Email kamu belum terdaftar. Hubungi pengurus bank sampah.")
 else:
     halaman = PAGES[CU["peran"]]
+    bar_atas()
     halaman[S.page if S.page in halaman else "Beranda"][1]()
+    jalan_pintas_panduan()
 
 simpan_jika_berubah()

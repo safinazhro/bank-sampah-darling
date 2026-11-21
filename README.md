@@ -101,6 +101,9 @@ Berkas `secrets.toml` tidak boleh diunggah ke GitHub.
 
 ## Struktur Repository
 - `app.py`: source code aplikasi
+- `demo_data.py`: pembangun data simulasi untuk Mode Demo
+- `panduan.py`: isi Panduan Penggunaan (per peran dan per halaman)
+- `tests/uji_fitur.py`: uji fungsional (fitur lama, Mode Demo, Panduan)
 - `requirements.txt`: daftar pustaka
 - `assets/`: logo aplikasi EcoLedger Darling
 - `.streamlit/`: pengaturan tema dan contoh pengaturan rahasia
@@ -114,3 +117,17 @@ Berkas `secrets.toml` tidak boleh diunggah ke GitHub.
   cadangan data (JSON, tanpa kata sandi).
 - Informasi koneksi database disimpan di Secrets Streamlit, bukan di repository.
 - Data pada tahap pengujian berupa data contoh agar data pribadi nasabah terlindungi.
+
+## Mode Demo
+Di halaman login tersedia tombol **Masuk sebagai Demo** (tanpa email, kata sandi, atau pendaftaran).
+- Memakai data simulasi yang dibuat baru untuk setiap sesi, terpisah dari data asli. Data asli tidak dibaca dan tidak ditulis oleh sesi demo.
+- Pengguna dapat berpindah tampilan **Pengurus / Nasabah / Pengepul** lewat pilihan *Lihat tampilan sebagai* di bagian atas halaman, mencoba setoran, persetujuan, penarikan, dan penjualan, lalu melihat dashboard dan laporan.
+- Tombol *Atur ulang data demo* mengembalikan data simulasi ke kondisi awal.
+
+## Panduan Penggunaan
+- Menu **Panduan Penggunaan** tersedia untuk semua peran (juga lewat tombol di Profil Saya / Pengaturan).
+- Tombol **Panduan Halaman Ini** di bagian atas setiap halaman membuka penjelasan khusus halaman yang sedang dibuka.
+- Pengepul hanya melihat panduan Pengepul; Nasabah hanya panduan Nasabah; Pengurus melihat ketiganya.
+
+## Menjalankan Uji
+`python tests/uji_fitur.py` (memakai SQLite sementara, tidak menyentuh data asli).
